@@ -1,53 +1,40 @@
 /**************************************************************************
       Author:   Bruce E. Hall, w8bh.net
         Date:   26 Jun 2019
-    Hardware:   STM32F103C "Blue Pill", Piezo Buzzer, 2.2" ILI9341 LCD
+    Hardware:   STM32F103C "Blue Pill", Piezo Buzzer, 2.2" ILI9341 LCD,
+                Adafruit #477 rotary encoder or similar
     Software:   Arduino IDE 1.8.9; stm32duino package @ dan.drown.org
     
- Description:   Morse Code Tutor, Part 4 
-                Builds on MoreMorse, adding an LCD display
-                to show characters sent & received.
+ Description:   Morse Code Tutor, Part 5 
+                Builds on Part 4, adding a rotary encoder
    
  **************************************************************************/
 /**************************************************************************
 Modification:   Ken, KM4NFQ "Not Fully Qualified"
-        Date:   5 July 2019
-    Hardware:   Mega2560 Pro Mini, Small Speaker, 2.2" ILI9341 LCD, 
-	            Dual Lever Paddles
- Description:   'port' of Blue Bill Morse Tutor to Mega2560 Pro Mini board
-                Adding an ILI9341 2.2" TFT SPI 320x240 display to the
-                Mega2560 Pro Mini.
+        Date:   8 Jul 2019
+    Hardware:   Mega2560 Pro Mini, TFT display, Rotary Encoder
+    Software:   Arduino IDE 1.8.9
+ Description:   'port' from Blue Pill to Mega2560 Pro Mini
+                Adding a Rotary Encoder for item selection.
  **************************************************************************/
-
-//#include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 
-#define CODESPEED   13                  // speed in Words per Minute
+#define CODESPEED          13           // speed in Words per Minute
 #define PITCH       700                 // CHG pitch in Hz of morse audio
 #define LED         13                  // CHG onboard LED pin
 #define PIEZO       26                  // CHG pin attached to piezo element
 #define DITPERIOD   1200/CODESPEED      // period of dit, in milliseconds
-#define WORDSIZE    5                   // number of chars per random word
+#define WORDSIZE            5           // number of chars per random word
 #define PADDLE_A    33                  // CHG Morse Paddle "dit"
 #define PADDLE_B    35                  // CHG Morse Paddle "dah"
+#define ENCODER_A           2           // CHG Rotary Encoder output A
+#define ENCODER_B           3           // CHG Rotary Encoder output B
+#define ENCODER_BUTTON     18           // CHG Rotary Encoder switch
 #define TFT_DC      48                  // CHG for direct port access
 #define TFT_CS      47                  // CHG for direct port access
 #define TFT_RST     44                  // CHG
 #define ELEMENTS(x) (sizeof(x) / sizeof(x[0]))
-/**************************************************************************
-Display Pin    Label    Connects To:        Function
-1              Vcc      Vcc bus             (3.3V) Power
-2              Gnd      Gnd bus             Ground
-3              CS       Mega2560, pin 47    Chip Select
-4              RST      Mega2560, pin 44    Display Reset
-5              DC       Mega2560, pin 48    Data/Cmd Line
-6              MOSI     Mega2560, pin 51    SPI Data
-7              SCK      Mega2560, pin 52    SPI Clock
-8              LED      Vcc bus             (3.3V) LED Backlight Power
-9              MISO     Mega2560, pin 49    SPI Data
- **************************************************************************/
-
 
 //===================================  Color Constants ==================================
 #define BLACK          0x0000
@@ -69,11 +56,18 @@ Display Pin    Label    Connects To:        Function
 #define MAXROW   DISPLAYHEIGHT/ROWSPACING         // Number of text-rows per screen
 #define TEXTCOLOR      YELLOW                     // Default non-menu text color
 
+//===================================  Rotary Encoder Variables =========================
+volatile int      rotary_counter   = 0;           // "position" of rotary encoder (increments CW) 
+volatile boolean  rotary_changed   = false;       // true if rotary_counter has changed
+volatile boolean  button_pressed   = false;       // true if the button has been pushed
+volatile boolean  button_released  = false;       // true if the button has been released (sets button_downtime)
+volatile long     button_downtime  = 0L;          // ms the button was pushed before released
+
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 int textRow=0, textCol=0;
 
-char *greetings   = "Greetings de KM4NFQ = Name is Ken = +";
+char *greetings   = "Greetings de KM4NFQ = Name is Ken = +"; // CHG
 char *commonWords = "the of and to a in that is was he for it with as his on be at by I this had not are but from or have an they which one you were all her she there would their we him been has when who will no more if out so up said what its about than into them can only other time new some could these two may first then do any like my now over such our man me even most made after also did many off before must well back through years much where your way"; // CHG
 char *hamWords[]  = {"DE", "TNX FER", "BT", "WX", "HR", "TEMP", "ES", "RIG", "ANT", "DIPOLE", "VERTICAL", // 0-10
                     "BEAM", "HW", "CPI", "WARM", "SUNNY", "CLOUDY", "COLD", "RAIN", "SNOW", "FOG",       // 11-20
@@ -241,7 +235,7 @@ void createCallsign(char* call)              // returns with random US callsign 
 
 void sendNumbers()                           // send random numbers forever...
 { 
-  while (true) {
+  while (!button_pressed) {
     for (int i=0; i<WORDSIZE; i++)           // break them up into "words"
       sendCharacter(randomNumber());         // send a number
     sendCharacter(' ');                      // send a space between number groups
@@ -250,7 +244,7 @@ void sendNumbers()                           // send random numbers forever...
 
 void sendLetters()                           // send random letters forever...
 { 
-  while (true) {
+  while (!button_pressed) {
     for (int i=0; i<WORDSIZE; i++)           // break them up into "words"
       sendCharacter(randomLetter());         // send the letter 
     sendCharacter(' ');                      // send a space between words
@@ -259,7 +253,7 @@ void sendLetters()                           // send random letters forever...
 
 void sendMixedChars()                        // send letter/number groups...
 { 
-  while (true) {                            
+  while (!button_pressed) {                            
     for (int i=0; i<WORDSIZE; i++)           // break them up into "words"
     {
       int c = '0' + random(43);              // pick a random character
@@ -271,7 +265,7 @@ void sendMixedChars()                        // send letter/number groups...
 
 void sendHamWords()                          // send some common ham words
 { 
-  while (true) {
+  while (!button_pressed) {
     int index=random(0, ELEMENTS(hamWords)); // eeny, meany, miney, moe
     sendString(hamWords[index]);             // send the word
     sendCharacter(' ');                      // and a space between words
@@ -280,7 +274,7 @@ void sendHamWords()                          // send some common ham words
 
 void sendCommonWords()
 { 
-  while (true) {
+  while (!button_pressed) {
     sendString(commonWords);                 // one long string of 100 words
   }
 }
@@ -288,7 +282,7 @@ void sendCommonWords()
 void sendCallsigns()                         // send random US callsigns
 { 
   char call[8];                              // need string to stuff callsign into
-  while (true) {
+  while (!button_pressed) {
     createCallsign(call);                    // make it
     sendString(call);                        // and send it
     sendCharacter(' ');
@@ -347,7 +341,115 @@ void addBunchOfCharacters()                       // just for testing...
     addCharacter(randomLetter());
 }
 
+/* 
+   Rotary Encoder Button Interrupt Service Routine ----------
+   Process encoder button presses and releases, including debouncing (extra "presses" from 
+   noisy switch contacts). If button is pressed, the button_pressed flag is set to true. If 
+   button is released, the button_released flag is set to true, and button_downtime will 
+   contain the duration of the button press in ms.  Manually reset flags after handling event. 
+*/
+
+void buttonISR()
+{  
+  static boolean button_state = false;
+  static unsigned long start, end;  
+  boolean pinState = digitalRead(ENCODER_BUTTON);
+  
+  if ((pinState==LOW) && (button_state==false))                     
+  {                                               // Button was up, but is now down
+    start = millis();                             // mark time of button down
+    if (start > (end + 10))                       // was button up for 10mS?
+    {
+      button_state = true;                        // yes, so change state
+      button_pressed = true;
+    }
+  }
+  else if ((pinState==HIGH) && (button_state==true))                       
+  {                                               // Button was down, but now up
+    end = millis();                               // mark time of release
+    if (end > (start + 10))                       // was button down for 10mS?
+    {
+      button_state = false;                       // yes, so change state
+      button_released = true;
+      button_downtime = end - start;              // and record how long button was down
+    }
+  }
+}
+
+
+/* 
+   Rotary Encoder "A" Interrupt Service Routine ---------------
+   This function will runs when encoder pin A changes state. The rotary "position" is held 
+   in rotary_counter, increasing for CW rotation, decreasing for CCW rotation. If the 
+   position changes, rotary_change will be set true.  
+*/
+  
+void rotaryISR_A()
+{
+  static uint8_t rotary_state = 0;                // holds current and previous encoder states   
+
+  rotary_state <<= 2;                             // shift previous state up 2 bits
+  rotary_state |= (digitalRead(ENCODER_A));       // put encoder_A on bit 0
+  rotary_state |= (digitalRead(ENCODER_B) << 1);  // put encoder_B on bit 1
+  rotary_state &= 0x0F;                           // zero upper 4 bits
+
+  if ((rotary_state == 0x09) ||                   // 9 = binary 1001 = 01 to 10 transition.
+     (rotary_state == 0x06))                      // 6 = binary 0110 = 10 to 01 transition.
+  {
+    rotary_counter++;                             // CW rotation: increment counter 
+    rotary_changed = true;
+  }
+  else if ((rotary_state == 0x03) ||              // 3 = binary 0011 = 11 to 00 transition.
+      (rotary_state == 0x0C))                     // C = binary 1100 = 00 to 11 transition.
+  {
+    rotary_counter--;                             // CCW rotation: decrement counter
+    rotary_changed = true;
+  }
+}
+
+/* 
+   Rotary Encoder "AB" Interrupt Service Routine ---------------
+   This is an alternative to rotaryISR() above.
+   It gives twice the resolution at a cost of using an additional interrupt line
+   This function will runs when either encoder pin A or B changes state.
+   The states array maps each transition 0000..1111 into CW/CCW rotation (or invalid).
+   The rotary "position" is held in rotary_counter, increasing for CW rotation, decreasing 
+   for CCW rotation. If the position changes, rotary_change will be set true. 
+   You should set this to false after handling the change.
+   To implement, attachInterrupts to encoder pin A *and* pin B 
+*/
+
+ 
+void rotaryISR()
+{
+  const int states[] = {0,1,-1,0,-1,0,0,1,1,0,0,-1,0,-1,1,0};
+  static byte rotary_state = 0;                   // holds current and previous encoder states   
+
+  rotary_state <<= 2;                             // shift previous state up 2 bits
+  rotary_state |= (digitalRead(ENCODER_A));       // put encoder_A on bit 0
+  rotary_state |= (digitalRead(ENCODER_B) << 1);  // put encoder_B on bit 1
+  rotary_state &= 0x0F;                           // zero upper 4 bits
+
+  int change = states[rotary_state];              // map transition to CW vs CCW rotation
+  if (change!=0)                                  // make sure transition is valid
+  {
+    rotary_changed = true;                          
+    rotary_counter += change;                     // update rotary counter +/- 1
+  }
+}
+
+void initEncoder()
+{
+  pinMode(ENCODER_A, INPUT_PULLUP);
+  pinMode(ENCODER_B, INPUT_PULLUP);
+  pinMode(ENCODER_BUTTON, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_BUTTON),buttonISR,CHANGE);   
+  attachInterrupt(digitalPinToInterrupt(ENCODER_A),rotaryISR,CHANGE); 
+  attachInterrupt(digitalPinToInterrupt(ENCODER_B),rotaryISR,CHANGE); 
+}
+
 void setup() {
+  initEncoder();
   pinMode(LED,OUTPUT);
   pinMode(PADDLE_A, INPUT_PULLUP);                // two paddle inputs, both active low
   pinMode(PADDLE_B, INPUT_PULLUP);
@@ -356,22 +458,12 @@ void setup() {
   tft.fillScreen(BLACK);                          // start with blank screen
   tft.setTextSize(2);                             // small text but readable
   tft.setTextColor(TEXTCOLOR,BLACK);
-  //tft.print("Hello from KM4NFQ");                 // CHG for testing only
-
-  //uncomment any of the routines below to try them out...
-  
-  //sendWords();                               
-  //sendLetters();
-  //sendNumbers();
-  //sendMixedChars();
-  //sendCallsigns();
-  //sendCommonWords();
-  //addBunchOfCharacters();
-  //doPaddles();
 }
 
-void loop() {
-  sendString(greetings);                     // just in case you didn't try anything above.
-  delay(5000);
-  clearScreen();                                 // start again!
+void loop() {                              
+  sendLetters();      button_pressed = false; 
+  sendNumbers();      button_pressed = false;
+  sendHamWords();     button_pressed = false;  
+  sendMixedChars();   button_pressed = false; 
+  sendCallsigns();    button_pressed = false;  
 }
