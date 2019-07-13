@@ -1,6 +1,6 @@
 /**************************************************************************
       Author:   Bruce E. Hall, w8bh.net
-        Date:   07 Jul 2019
+        Date:   12 Jul 2019
     Hardware:   STM32F103C "Blue Pill", 2.2" ILI9341 TFT display, Piezo
     Software:   Arduino IDE 1.8.9; stm32duino package @ dan.drown.org
        Legal:   Copyright (c) 2019  Bruce E. Hall.
@@ -10,52 +10,54 @@
                 Practice sending & receiving morse code
                 Inspired by Jack Purdum's "Morse Code Tutor"
 
- *************************************************************************/
+**************************************************************************/
 /**************************************************************************
 Modification:   Ken, KM4NFQ "Not Fully Qualified"
         Date:   9 Jul 2019
     Hardware:   RobotDyn Mega2560 Pro Mini (non-USB version)
-                programmed with a USBtoSerial adapter
-                ILI9341 2.2" TFT SPI 320x240 display
-				small speaker, RobotDyn Rotary Encoder module
+                programmed with a USBtoSerial Adapter
+                ILI9341 2.2" TFT SPI 320x240 display w/ 8GB Class 4 SD card
+                RobotDyn Rotary Encoder module, small speaker
     Software:   Arduino IDE 1.8.9
- Description:   'port' to Mega2560 from Blue Pill
- *************************************************************************/
 
+ Description:   a 'port' from the Blue Pill to the Mega2560 Pro Mini
+                added an SD card for Receive > Books menu item
+                additional menu item added to Send:
+**************************************************************************/
 
-//====================  INCLUDES ========================================= 
+//===================================  INCLUDES ========================================= 
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 #include "EEPROM.h"
 #include "SD.h"
 
-//====================  Hardware Connections =============================
+//===================================  Hardware Connections =============================
 #define TFT_DC             48    // CHG LCD "DC" pin
 #define TFT_CS             47    // CHG LCD "CS" pin
 #define TFT_RST            44    // CHG LCD "RST pin
 #define SD_CS              53    // CHG SD card "CS" pin
 #define ENCODER_A           2    // CHG Rotary Encoder output A
 #define ENCODER_B           3    // CHG Rotary Encoder output B
-#define ENCODER_BUTTON     18    // CHG Rotary Encoder switch
 #define LED                13    // CHG onboard LED pin
+#define ENCODER_BUTTON     18    // CHG Rotary Encoder switch
 #define PADDLE_A           33    // CHG Morse Paddle "dit"
 #define PADDLE_B           35    // CHG Morse Paddle "dah"
 #define PIEZO              26    // CHG pin attached to piezo element
 
-//====================  Morse Code Constants =============================
+//===================================  Morse Code Constants =============================
 #define MYCALL       "KM4NFQ"    // CHG your callsign for splash scrn & QSO
-#define TEXTFILE  "morse.txt"    // name of file on SD card
-#define DEFAULTSPEED       13    // character speed in Words per Minute
-#define MAXSPEED           50    // fastest morse speed in WPM
-#define MINSPEED            3    // slowest morse speed in WPM
+#define TEXTFILE        "morse.txt"               // name of file on SD card
+#define DEFAULTSPEED       13                     // character speed in Words per Minute
+#define MAXSPEED           50                     // fastest morse speed in WPM
+#define MINSPEED            3                     // slowest morse speed in WPM
 #define DEFAULTPITCH      700    // CHG default pitch in Hz of morse audio
 #define MAXPITCH         2000    // CHG highest allowed pitch
-#define MINPITCH          300    // how low can you go
-#define WORDSIZE            5    // number of chars per random word
-#define FLASHCARDDELAY   2000    // wait in mS between cards
-#define ENCODER_TICKS       3    // Ticks required to register movement
+#define MINPITCH          300                     // how low can you go
+#define WORDSIZE            5                     // number of chars per random word
+#define FLASHCARDDELAY   2000                     // wait in mS between cards
+#define ENCODER_TICKS       3                     // Ticks required to register movement
 
-//====================  Color Constants ==================================
+//===================================  Color Constants ==================================
 #define BLACK          0x0000
 #define BLUE           0x001F
 #define RED            0xF800
@@ -66,7 +68,7 @@ Modification:   Ken, KM4NFQ "Not Fully Qualified"
 #define WHITE          0xFFFF
 #define DKGREEN        0x03E0
 
-// ===================  Menu Constants ===================================
+// ==================================  Menu Constants ===================================
 #define DISPLAYWIDTH      320                     // Number of LCD pixels in long-axis
 #define DISPLAYHEIGHT     240                     // Number of LCD pixels in short-axis
 #define TOPDEADSPACE       30                     // All submenus appear below top line
@@ -84,37 +86,35 @@ Modification:   Ken, KM4NFQ "Not Fully Qualified"
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 
-//====================  Rotary Encoder Variables =========================
-volatile int      rotary_counter   = 0;        // "position" of rotary encoder (increments CW) 
-volatile boolean  rotary_changed   = false;    // true if rotary_counter has changed
-volatile boolean  button_pressed   = false;    // true if the button has been pushed
-volatile boolean  button_released  = false;    // true if the button has been released (sets button_downtime)
-volatile long     button_downtime  = 0L;       // ms the button was pushed before released
+//===================================  Rotary Encoder Variables =========================
+volatile int      rotaryCounter    = 0;           // "position" of rotary encoder (increments CW) 
+volatile boolean  button_pressed   = false;       // true if the button has been pushed
+volatile boolean  button_released  = false;       // true if the button has been released (sets button_downtime)
+volatile long     button_downtime  = 0L;          // ms the button was pushed before released
 
-//====================  Morse Code Variables =============================
+//===================================  Morse Code Variables =============================
 
-        // The following is a list of the 100 most-common English words, in frequency order.
-        // See: https://www.dictionary.com/e/common-words/
-        // from The Brown Corpus Standard Sample of Present-Day American English 
-        // (Providence, RI: Brown University Press, 1979)
+                    // The following is a list of the 100 most-common English words, in frequency order.
+                    // See: https://www.dictionary.com/e/common-words/
+                    // from The Brown Corpus Standard Sample of Present-Day American English 
+                    // (Providence, RI: Brown University Press, 1979)
                     
-char *words[] = {"the", "of", "and", "to", "a", "in", "that", "is", "was", "he", 
-                 "for", "it", "with", "as", "his", "on", "be", "at", "by", "I", 
-                 "this", "had", "not", "are", "but", "from", "or", "have", "an", 
-				 "they", "which", "one", "you", "were", "all", "her", "she", "there", 
-				 "would", "their", "we", "him", "been", "has", "when", "who", "will",
-				 "no", "more", "if", "out", "so", "up", "said", "what", "its", "about",
-				 "than", "into", "them", "can", "only", "other", "time", "new", "some",
-				 "could", "these", "two", "may", "first", "then", "do", "any", "like", 
-				 "my", "now", "over", "such", "our", "man", "me", "even", "most", "made",
-				 "after", "also", "did", "many", "off", "before", "must", "well", "back", 
-				 "through", "years", "much", "where", "your", "way"  
-                };
+char *words[]     = {"THE", "OF", "AND", "TO", "A", "IN", "THAT", "IS", "WAS", "HE", 
+                     "FOR", "IT", "WITH", "AS", "HIS", "ON", "BE", "AT", "BY", "I", 
+                     "THIS", "HAD", "NOT", "ARE", "BUT", "FROM", "OR", "HAVE", "AN", "THEY", 
+                     "WHICH", "ONE", "YOU", "WERE", "ALL", "HER", "SHE", "THERE", "WOULD", "THEIR", 
+                     "WE", "HIM", "BEEN", "HAS", "WHEN", "WHO", "WILL", "NO", "MORE", "IF", 
+                     "OUT", "SO", "UP", "SAID", "WHAT", "ITS", "ABOUT", "THAN", "INTO", "THEM", 
+                     "CAN", "ONLY", "OTHER", "TIME", "NEW", "SOME", "COULD", "THESE", "TWO", "MAY", 
+                     "FIRST", "THEN", "DO", "ANY", "LIKE", "MY", "NOW", "OVER", "SUCH", "OUR", 
+                     "MAN", "ME", "EVEN", "MOST", "MADE", "AFTER", "ALSO", "DID", "MANY", "OFF", 
+                     "BEFORE", "MUST", "WELL", "BACK", "THROUGH", "YEARS", "MUCH", "WHERE", "YOUR", "WAY"  
+                    };
 char *antenna[]   = {"DIPOLE", "VERTICAL", "BEAM"};
 char *weather[]   = {"WARM", "SUNNY", "CLOUDY", "COLD", "RAIN", "SNOW", "FOGGY"};
 char *names[]     = {"FRED", "JOHN", "TERRY", "JANE", "SUE", "LEON", "KIP", "DOUG", "ZEKE", "JOSH", "JILL", "LYNN"};
 char *cities[]    = {"MEDINA, OH", "BILLINGS, MT", "SAN DIEGO", "WALLA WALLA, WA", "VERO BEACH, FL", "NASHVILLE, TN", "NYC", "CHICAGO", "LOS ANGELES", // 0-8
-                    "POSSUM TROT, MS", "ASPEN, CO", "AUSTIN, TX", "RALIEGH, NC"};
+                    "POSSUM TROT, MS", "ASPEN, CO", "AUSTIN, TX", "RALEIGH, NC"};
 char *rigs[]      = {"YAESU FT101", "KENWOOD 780", "ELECRAFT K3", "HOMEBREW", "QRPLABS QCX", "ICOM 7410", "FLEX 6400"};
 char punctuation[]= "!@$&()-+=,.:;'/";
 char prefix[]     = {'A', 'W', 'K', 'N'};
@@ -187,14 +187,14 @@ int dahPaddle = PADDLE_B;
 int pitch     = DEFAULTPITCH;
 bool paused   = false;
 
-//====================  Menu Variables ===================================
+//===================================  Menu Variables ===================================
 int  menuCol=0, textRow=0, textCol=0;
 char *mainMenu[] = {" Receive ", "  Send   ", "  Config "};        
 char *menu0[]    = {" Letters ", " Words   ", " Book    ", " QSO     ", " Numbers ", " Punc    ", " Mixed   ", "Callsigns",  " Exit    "};
-char *menu1[]    = {" Practice", " Copy One", " Copy Two", " Cpy Call", "Flashcard", " Exit    "};
+char *menu1[]    = {" Practice", " Copy One", " Copy Two", " Cpy Word", " Cpy Call", "Flashcard", " Exit    "};
 char *menu2[]    = {" Speed   ", "CharSpeed", "Chk Speed", " Tone    ", " Dit Pad ", " Defaults", " Exit    "};
 
-//====================  Rotary Encoder Code  =============================
+//===================================  Rotary Encoder Code  =============================
 
 /* 
    Rotary Encoder Button Interrupt Service Routine ----------
@@ -246,19 +246,12 @@ void buttonISR()
 void rotaryISR()
 {
   const int states[] = {0,1,-1,0,-1,0,0,1,1,0,0,-1,0,-1,1,0};
-  static byte rotary_state = 0;                   // holds current and previous encoder states   
-
-  rotary_state <<= 2;                             // shift previous state up 2 bits
-  rotary_state |= (digitalRead(ENCODER_A));       // put encoder_A on bit 0
-  rotary_state |= (digitalRead(ENCODER_B) << 1);  // put encoder_B on bit 1
-  rotary_state &= 0x0F;                           // zero upper 4 bits
-
-  int change = states[rotary_state];              // map transition to CW vs CCW rotation
-  if (change!=0)                                  // make sure transition is valid
-  {
-    rotary_changed = true;                          
-    rotary_counter += change;                     // update rotary counter +/- 1
-  }
+  static byte transition = 0;                     // holds current and previous encoder states   
+  transition <<= 2;                               // shift previous state up 2 bits
+  transition |= (digitalRead(ENCODER_A));         // put encoder_A on bit 0
+  transition |= (digitalRead(ENCODER_B) << 1);    // put encoder_B on bit 1
+  transition &= 0x0F;                             // zero upper 4 bits
+  rotaryCounter += states[transition];            // update counter +/- 1 based on rotation
 }
 
 boolean buttonDown()                              // check CURRENT state of button
@@ -291,17 +284,16 @@ void waitForButtonPress()
 
 int readEncoder(int numTicks = ENCODER_TICKS) 
 {
-  static int prevCounter = 0;                 // holds last encoder position
-  rotary_changed = false;                     // Clear flag
-  int change = rotary_counter - prevCounter;  // how many ticks since last call?
-  if (abs(change)<=numTicks)                  // not enough ticks?
-    return 0;                                 // so exit with a 0.
-  prevCounter = rotary_counter;               // enough clicks, so save current counter values
-  return (change>0) ? 1:-1;                   // return +1 for CW rotation, -1 for CCW    
+  static int prevCounter = 0;                     // holds last encoder position
+  int change = rotaryCounter - prevCounter;       // how many ticks since last call?
+  if (abs(change)<=numTicks)                      // not enough ticks?
+    return 0;                                     // so exit with a 0.
+  prevCounter = rotaryCounter;                    // enough clicks, so save current counter values
+  return (change>0) ? 1:-1;                       // return +1 for CW rotation, -1 for CCW   
 }
 
 
-//====================  Morse Routines ===================================
+//===================================  Morse Routines ===================================
 
 bool ditPressed()
 {
@@ -386,11 +378,13 @@ void sendCharacter(char c) {                      // send a single ASCII charact
   if (c<32) return;                               // ignore control characters
   if (c>96) c -= 32;                              // convert lower case to upper case
   if (c>90) return;                               // not a character
-  checkForSpeedChange();                          // allow change in speed while sending
-  do checkPause(); while (paused);                // allow user to pause morse output
   addCharacter(c);                                // display character on LCD
   if (c==32) wordSpace();                         // space between words 
   else sendElements(morse[c-33]);                 // send the character
+  checkForSpeedChange();                          // allow change in speed while sending
+  do 
+    checkPause(); 
+  while (paused);                                 // allow user to pause morse output
 }
 
 void sendString (char *ptr) {             
@@ -437,13 +431,13 @@ void checkPause()
     paused = false;                               // yes, so resume output
 }
 
-//====================  Receive Menu  ====================================
+//===================================  Receive Menu  ====================================
 
 
 void addChar (char* str, char ch)                 // adds 1 character to end of string
 {                                            
   char c[2] = " ";                                // happy hacking: char into string
-  c[0] = ch;                                      // change char'A' to string"A"
+  c[0] = ch;                                      // change char 'A' to string "A"
   strcat(str,c);                                  // and add it to end of string
 }
 
@@ -587,7 +581,7 @@ void sendBook()
   const int pageSkip = 250;  
   File book = SD.open(TEXTFILE);                  // look for book on sd card
   if (book) {                                     // find it? 
-    while (book.available()) {                    // do for all characters in book: 
+    while (book.available()) {                    // do for all characters in book:                
       char ch = book.read();                      // get next character
       sendCharacter(ch);                          // and send it
       if (ch=='\r') sendCharacter(' ');           // treat CR as a space
@@ -603,12 +597,12 @@ void sendBook()
 }
 
 
-//====================  Send Menu  =======================================
+//===================================  Send Menu  =======================================
 
 void checkSpeed()
 {
   long start=millis();
-  sendString("PARIS ");                           // send "PARIS" 
+  sendString("PARIS ");                           // send "PARIS"                                     
   long elapsed=millis()-start;                    // see how long it took
   dit();                                          // sound out the end.
   float wpm = 60000.0/elapsed;                    // convert time to WPM
@@ -705,6 +699,17 @@ void copyTwoChars()
   }
 }
 
+void copyWords()                                  // show a callsign & see if user can copy it
+{
+  char text[10];
+  while (!button_pressed)                      
+  { 
+    int index=random(0, ELEMENTS(words));         // eeny, meany, miney, moe
+    strcpy(text,words[index]);                    // pick a random word       
+    mimick(text);                                 // and ask user to copy it
+  }
+}
+
 void mimick(char *text)
 {
   const int x=200,y=50,wd=105,ht=80;              // posn & size of score card
@@ -720,7 +725,7 @@ void mimick(char *text)
     ch = receivedChar();                          // get a character
     if (ch!=' ') addChar(response,ch);            // add it to the response
     addCharacter(ch);                             // and put it on screen
-  } while (ch!=' ');                              // space = word timeout 
+  } while (ch!=' ');                              // space = word timeout
   if (!strcmp(text,response))                     // did user match the text?
   {                                               // Yes! So show score card
     tft.setCursor(x+15,y+20);
@@ -761,7 +766,7 @@ void flashcards()
 
 
 
-//====================  Config Menu  =====================================
+//===================================  Config Menu  =====================================
 
 void saveConfig()
 {
@@ -809,9 +814,9 @@ void setCodeSpeed()
     {
       codeSpeed += dir;                           // ...so change speed up/down          
       if (codeSpeed<MINSPEED) 
-		    codeSpeed = MINSPEED;                     // dont go below minimum
+        codeSpeed = MINSPEED;                     // dont go below minimum
       if (codeSpeed>MAXSPEED) 
-		    codeSpeed = MAXSPEED;                     // dont go above maximum
+        codeSpeed = MAXSPEED;                     // dont go above maximum
       tft.fillRect(x,y,50,50,BLACK);              // erase old speed
       tft.setCursor(x,y);
       tft.print(codeSpeed);                       // and show new speed    
@@ -838,9 +843,9 @@ void setCharSpeed()
     {
       charSpeed += dir;                           // ...so change speed up/down 
       if (charSpeed<MINSPEED) 
-		    charSpeed = MINSPEED;                     // dont go below minimum
+        charSpeed = MINSPEED;                     // dont go below minimum
       if (charSpeed>MAXSPEED) 
-		    charSpeed = MAXSPEED;                     // dont go above maximum
+        charSpeed = MAXSPEED;                     // dont go above maximum
       tft.fillRect(x,y,50,50,BLACK);              // erase old speed
       tft.setCursor(x,y);
       tft.print(charSpeed);                       // and show new speed 
@@ -892,40 +897,40 @@ void setDitPaddle()
   roger();                                        // and acknowledge
 }
 
-//====================  Menu Routines ====================================
+//===================================  Menu Routines ====================================
 
-void showCharacter(char c, int row, int col)   // display a character at given row & column
+void showCharacter(char c, int row, int col)      // display a character at given row & column
 {
-  int x = col * COLSPACING;                    // convert column to x coordinate
-  int y = TOPDEADSPACE + (row * ROWSPACING);   // convert row to y coordinate
-  tft.setCursor(x,y);                          // position character on screen
-  tft.print(c);                                // and display it 
+  int x = col * COLSPACING;                       // convert column to x coordinate
+  int y = TOPDEADSPACE + (row * ROWSPACING);      // convert row to y coordinate
+  tft.setCursor(x,y);                             // position character on screen
+  tft.print(c);                                   // and display it 
 }
 
 void addCharacter(char c)
 {
-  showCharacter(c,textRow,textCol);            // display character & current row/col position
-  textCol++;                                   // go to next position on the current row
-  if ((textCol>=MAXCOL) ||                     // are we at end of the row?
-     ((c==' ') && (textCol>MAXCOL-7)))         // or at a wordspace thats near end of row?
+  showCharacter(c,textRow,textCol);               // display character & current row/col position
+  textCol++;                                      // go to next position on the current row
+  if ((textCol>=MAXCOL) ||                        // are we at end of the row?
+     ((c==' ') && (textCol>MAXCOL-7)))            // or at a wordspace thats near end of row?
   {
-    textRow++; textCol=0;                      // yes, so advance to beginning of next row
-    if (textRow >= MAXROW)                     // but have we run out of rows?
+    textRow++; textCol=0;                         // yes, so advance to beginning of next row
+    if (textRow >= MAXROW)                        // but have we run out of rows?
     {
-      eraseMenus();                            // yes, so clear screen
-      textRow=0;                               // and start on first row
+      eraseMenus();                               // yes, so clear screen
+      textRow=0;                                  // and start on first row
     }
   }
 }
 
-void eraseMenus()                              // clear the text portion of the display
+void eraseMenus()                                 // clear the text portion of the display
 {
   tft.fillRect(0, TOPDEADSPACE, DISPLAYWIDTH, DISPLAYHEIGHT, BLACK);
   tft.setTextColor(TEXTCOLOR,BLACK);
   tft.setCursor(0,TOPDEADSPACE);
 }
 
-int getMenuSelection()                         // Display menu system & get user selection
+int getMenuSelection()                            // Display menu system & get user selection
 {
   int item;
   eraseMenus();                                   // start with fresh screen
@@ -933,15 +938,15 @@ int getMenuSelection()                         // Display menu system & get user
   switch (menuCol)                                // now show menu that user selected:
   {
    case 0: 
-     item = subMenu(menu0,ELEMENTS(menu0));    // "receive" dropdown menu
+     item = subMenu(menu0,ELEMENTS(menu0));       // "receive" dropdown menu
      break;
    case 1: 
-     item = subMenu(menu1,ELEMENTS(menu1));    // "send" dropdown menu
+     item = subMenu(menu1,ELEMENTS(menu1));       // "send" dropdown menu
      break;
    case 2: 
-     item = subMenu(menu2,ELEMENTS(menu2));    // "config" dropdown menu
+     item = subMenu(menu2,ELEMENTS(menu2));       // "config" dropdown menu
   }
-  return (menuCol*10 + item);                  // return user's selection
+  return (menuCol*10 + item);                     // return user's selection
 }
 
 void showMenuItem(char *item, int x, int y, int fgColor, int bgColor)
@@ -951,70 +956,70 @@ void showMenuItem(char *item, int x, int y, int fgColor, int bgColor)
   tft.print(item);  
 }
 
-int topMenu(char *menu[], int itemCount)       // Display a horiz menu & return user selection
+int topMenu(char *menu[], int itemCount)          // Display a horiz menu & return user selection
 {
-  int index = menuCol;                         // start w/ current row
-  tft.setTextSize(2);                          // sets menu text size
-  button_pressed = false;                      // reset button flag
+  int index = menuCol;                            // start w/ current row
+  tft.setTextSize(2);                             // sets menu text size
+  button_pressed = false;                         // reset button flag
 
-  for (int i = 0; i < itemCount; i++)          // for each item in menu                         
+  for (int i = 0; i < itemCount; i++)             // for each item in menu                         
     showMenuItem(menu[i],i*MENUSPACING,0,FG,BG);  // display it 
 
-  showMenuItem(menu[index],index*MENUSPACING,  // highlight current item
+  showMenuItem(menu[index],index*MENUSPACING,     // highlight current item
     0,SELECTFG,SELECTBG);
   tft.drawLine(0,TOPDEADSPACE-4,DISPLAYWIDTH,
-    TOPDEADSPACE-4, YELLOW);                   // horiz. line below menu
+    TOPDEADSPACE-4, YELLOW);                      // horiz. line below menu
 
-  while (!button_pressed)                      // loop for user input:
+  while (!button_pressed)                         // loop for user input:
   {
-    int dir = readEncoder();                   // check encoder
-    if (dir) {                                 // did it move?
+    int dir = readEncoder();                      // check encoder
+    if (dir) {                                    // did it move?
       showMenuItem(menu[index],index*MENUSPACING,
-	    0, FG,BG);                             // deselect current item
-      index += dir;                            // go to next/prev item
-      if (index > itemCount-1) index=0;        // dont go beyond last item
-      if (index < 0) index = itemCount-1;      // dont go before first item
+      0, FG,BG);                                  // deselect current item
+      index += dir;                               // go to next/prev item
+      if (index > itemCount-1) index=0;           // dont go beyond last item
+      if (index < 0) index = itemCount-1;         // dont go before first item
       showMenuItem(menu[index],index*MENUSPACING,
-	    0, SELECTFG,SELECTBG);                 // select new item         
+      0, SELECTFG,SELECTBG);                      // select new item         
     }  
   }
   return index;  
 }
 
-int subMenu(char *menu[], int itemCount) // Display drop-down menu & return user selection
+int subMenu(char *menu[], int itemCount)          // Display drop-down menu & return user selection
 {
   int index=0, x,y; 
-  button_pressed = false;                      // reset button flag
+  button_pressed = false;                         // reset button flag
 
-  x = menuCol * MENUSPACING;                   // x-coordinate of this menu
-  for (int i = 0; i < itemCount; i++)          // for all items in the menu...
+  x = menuCol * MENUSPACING;                      // x-coordinate of this menu
+  for (int i = 0; i < itemCount; i++)             // for all items in the menu...
   {
-     y = TOPDEADSPACE + i*ROWSPACING;          // calculate y coordinate
-     showMenuItem(menu[i],x,y,FG,BG);          // and show the item.
+     y = TOPDEADSPACE + i*ROWSPACING;             // calculate y coordinate
+     showMenuItem(menu[i],x,y,FG,BG);             // and show the item.
   }
-  showMenuItem(menu[index],x,TOPDEADSPACE,     // highlight selected item
+  showMenuItem(menu[index],x,TOPDEADSPACE,        // highlight selected item
     SELECTFG,SELECTBG);
 
-  while (!button_pressed)                      // exit on button press
+  while (!button_pressed)                         // exit on button press
   {
-    int dir = readEncoder();                   // check for encoder movement
-    if (dir)                                   // it moved!    
+    int dir = readEncoder();                      // check for encoder movement
+    if (dir)                                      // it moved!    
     {
-      y = TOPDEADSPACE + index*ROWSPACING;     // calc y-coord of current item
-      showMenuItem(menu[index],x,y,FG,BG);     // deselect current item
-      index += dir;                            // go to next/prev item
-      if (index > itemCount-1) index=0;        // dont go past last item
-      if (index < 0) index = itemCount-1;      // dont go before first item
-       y = TOPDEADSPACE + index*ROWSPACING;    // calc y-coord of new item
+      y = TOPDEADSPACE + index*ROWSPACING;        // calc y-coord of current item
+      showMenuItem(menu[index],x,y,FG,BG);        // deselect current item
+      index += dir;                               // go to next/prev item
+      if (index > itemCount-1) index=0;           // dont go past last item
+      if (index < 0) index = itemCount-1;         // dont go before first item
+       y = TOPDEADSPACE + index*ROWSPACING;       // calc y-coord of new item
       showMenuItem(menu[index],x,y,
-	    SELECTFG,SELECTBG);                    // select new item
+      SELECTFG,SELECTBG);                         // select new item
     }
   }
   return index;  
 }
 
 
-//====================  Main Program Code ================================
+//================================  Main Program Code ================================
 
 void initEncoder()
 {
@@ -1028,24 +1033,24 @@ void initEncoder()
 
 void initMorse()
 {
-  pinMode(LED,OUTPUT);            // LED, but could be keyer output instead
-  pinMode(PADDLE_A, INPUT_PULLUP);   // two paddle inputs, both active low
+  pinMode(LED,OUTPUT);                            // LED, but could be keyer output instead
+  pinMode(PADDLE_A, INPUT_PULLUP);                // two paddle inputs, both active low
   pinMode(PADDLE_B, INPUT_PULLUP);
-  ditPeriod = intracharDit();        // set up character timing from WPM 
-  dahPaddle = (ditPaddle==PADDLE_A)? // make dahPaddle opposite of dit
+  ditPeriod = intracharDit();                     // set up character timing from WPM 
+  dahPaddle = (ditPaddle==PADDLE_A)?              // make dahPaddle opposite of dit
      PADDLE_B: PADDLE_A;
-  roger();                           // acknowledge morse startup with an 'R'                
+  roger();                                        // acknowledge morse startup with an 'R'                
 }
 
 void initScreen()
 {
-  tft.begin();                       // initialize screen object
-  tft.setRotation(1);                // CHG landscape mode: use '1' or '3'
-  tft.fillScreen(BLACK);             // start with blank screen
+  tft.begin();                                    // initialize screen object
+  tft.setRotation(1);                             // CHG landscape mode: use '1' or '3'
+  tft.fillScreen(BLACK);                          // start with blank screen
 }
 
-void splashScreen()                  // not splashy at all!
-{                                    // have fun sprucing it up.
+void splashScreen()                               // not splashy at all!
+{                                                 // have fun sprucing it up.
   tft.setTextSize(3);
   tft.setTextColor(TEXTCOLOR);
   tft.setCursor(100, 50); 
@@ -1091,8 +1096,9 @@ void loop()
     case 10: receiveCode(); break;
     case 11: copyCharacters(); break;
     case 12: copyTwoChars(); break;
-    case 13: copyCallsigns(); break;
-    case 14: flashcards(); break;
+    case 13: copyWords(); break;
+    case 14: copyCallsigns(); break;
+    case 15: flashcards(); break;
     
     case 20: setCodeSpeed(); break;
     case 21: setCharSpeed(); break;
