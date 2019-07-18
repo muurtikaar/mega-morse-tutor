@@ -1,6 +1,6 @@
 /**************************************************************************
       Author:   Bruce E. Hall, w8bh.net
-        Date:   12 Jul 2019
+        Date:   14 Jul 2019
     Hardware:   STM32F103C "Blue Pill", 2.2" ILI9341 TFT display, Piezo
     Software:   Arduino IDE 1.8.9; stm32duino package @ dan.drown.org
        Legal:   Copyright (c) 2019  Bruce E. Hall.
@@ -11,17 +11,15 @@
                 
                 >> THIS VERSION UNDER DEVELOPMENT <<<
 
-**************************************************************************/
+ *************************************************************************/
 /**************************************************************************
-Modification:   Ken, KM4NFQ "Not Fully Qualified"
-        Date:   9 Jul 2019
-    Hardware:   RobotDyn Mega2560 Pro Mini (non-USB version)
-                programmed with a USBtoSerial adapter
-                ILI9341 2.2" TFT SPI 320x240 display
-                small speaker, RobotDyn Rotary Encoder module
-    Software:   Arduino IDE 1.8.9
- Description:   'port' to Mega2560 from Blue Pill
-**************************************************************************/
+Modifications:  Ken, KM4NFQ "Not Fully Qualified"
+         Date:  18 July 2019
+     Hardware:  Mega 2560 Pro Mini
+     Software:  Arduino IDE 1.8.9
+  Description:  'port' from Blue Pill to Mega 2560
+                All modifications have the letters 'CHG' in line comments
+ *************************************************************************/
 
 //===================================  INCLUDES ========================================= 
 #include "Adafruit_GFX.h"
@@ -34,25 +32,22 @@ Modification:   Ken, KM4NFQ "Not Fully Qualified"
 #define TFT_CS             47    // CHG LCD "CS" pin
 #define TFT_RST            44    // CHG LCD "RST pin
 #define SD_CS              53    // CHG SD card "CS" pin
+#define ENCODER_A           2    // CHG Rotary Encoder output A
+#define ENCODER_B           3    // CHG Rotary Encoder output B
 #define LED                13    // CHG onboard LED pin
+#define ENCODER_BUTTON     18    // CHG Rotary Encoder switch
 #define PADDLE_A           33    // CHG Morse Paddle "dit"
 #define PADDLE_B           35    // CHG Morse Paddle "dah"
 #define PIEZO              26    // CHG pin attached to piezo element
-#define ENCODER_A           2    // CHG Rotary Encoder output A
-#define ENCODER_B           3    // CHG Rotary Encoder output B
-#define ENCODER_BUTTON     18    // CHG Rotary Encoder switch
 
-#define MYCALL       "KM4NFQ"    // CHG your callsign for splash scrn & QSO
-#define DEFAULTPITCH      700    // CHG default pitch in Hz of morse audio
-#define MAXPITCH         2000    // CHG highest allowed pitch
 //===================================  Morse Code Constants =============================
-#define MYCALL          "W8BH"                    // your callsign for splash scrn & QSO
-#define TEXTFILE        "morse.txt"               // name of file on SD card
-#define DEFAULTSPEED       13                     // character speed in Words per Minute
+#define MYCALL       "KM4NFQ"    // CHG your callsign for splash scrn & QSO
+#define TEXTFILE     "morse.txt"               // name of file on SD card
+#define DEFAULTSPEED       12    // CHG character speed in Words per Minute
 #define MAXSPEED           50                     // fastest morse speed in WPM
 #define MINSPEED            3                     // slowest morse speed in WPM
-#define DEFAULTPITCH     1200                     // default pitch in Hz of morse audio
-#define MAXPITCH         2800                     // highest allowed pitch
+#define DEFAULTPITCH      700    // CHG default pitch in Hz of morse audio
+#define MAXPITCH         2000    // CHG highest allowed pitch
 #define MINPITCH          300                     // how low can you go
 #define WORDSIZE            5                     // number of chars per random word
 #define FLASHCARDDELAY   2000                     // wait in mS between cards
@@ -582,7 +577,8 @@ void sendBook()
   const int pageSkip = 250;  
   File book = SD.open(TEXTFILE);                  // look for book on sd card
   if (book) {                                     // find it? 
-    while (book.available()) {                    // do for all characters in book:                
+    while (!button_pressed && book.available())   // do for all characters in book:
+    {                                    
       char ch = book.read();                      // get next character
       sendCharacter(ch);                          // and send it
       if (ch=='\r') sendCharacter(' ');           // treat CR as a space
@@ -711,15 +707,27 @@ void copyWords()                                  // show a callsign & see if us
   }
 }
 
+void showScore(int score)                         // helper fn for mimick()
+{
+  const int x=200,y=50,wd=105,ht=80;              // posn & size of scorecard
+  int bkColor = (score>0)?GREEN:RED;              // back-color green unless score 0
+  tft.setCursor(x+15,y+20);                       // position text within scorecard
+  tft.setTextSize(6);                             // use big text,
+  tft.setTextColor(BLACK,bkColor);                // in inverted font,
+  tft.fillRect(x,y,wd,ht,bkColor);                // on selected background
+  tft.print(score);                               // show the score
+  tft.setTextSize(2);                             // resume usual size
+  tft.setTextColor(TEXTCOLOR,BLACK);              // resume usual colors  
+}
+
 void mimick(char *text)
 {
-  const int x=200,y=50,wd=105,ht=80;              // posn & size of score card
   char ch, response[20]; 
-  static int score=0;
-  textRow=1; textCol=10;
-  sendString(text);                               // send it.
-  strcpy(response,"");
-  textRow=2; textCol=10;
+  static int score=0;                              
+  textRow=1; textCol=10;                          // set position of text 
+  sendString(text);                               // display text & morse it
+  strcpy(response,"");                            // start with empty response
+  textRow=2; textCol=10;                          // set position of response
   while (!button_pressed && !ditPressed()         // wait until user is ready
     && !dahPressed()) ;
   do {                                            // user has started keying...
@@ -728,20 +736,9 @@ void mimick(char *text)
     addCharacter(ch);                             // and put it on screen
   } while (ch!=' ');                              // space = word timeout
   if (!strcmp(text,response))                     // did user match the text?
-  {                                               // Yes! So show score card
-    tft.setCursor(x+15,y+20);
-    tft.setTextSize(6);                           // big text
-    tft.setTextColor(BLACK,GREEN);                // inverted font
-    tft.fillRect(x,y,wd,ht,GREEN);                // with green background
-    tft.print(++score);                           // show the score
-    tft.setTextSize(2);                           // resume usual size
-    tft.setTextColor(TEXTCOLOR,BLACK);            // resume usual colors
-  } 
-  else 
-  {                                               // Oh no! User didnt match text
-    tft.fillRect(x,y,wd,ht,RED);                  // red scorecard
-    score = 0;                                    // reset score
-  }
+    score++;                                      // yes, so increment score
+  else score = 0;                                 // no, so reset score to 0
+  showScore(score);                               // display score for user
   delay(FLASHCARDDELAY);                          // wait between attempts
   eraseMenus();                                   // erase screen for next attempt
 }
@@ -1046,7 +1043,7 @@ void initMorse()
 void initScreen()
 {
   tft.begin();                                    // initialize screen object
-  tft.setRotation(1);                             // CHG landscape mode: use '1' or '3'
+  tft.setRotation(1);                        // CHG landscape mode: use '1' or '3'
   tft.fillScreen(BLACK);                          // start with blank screen
 }
 
