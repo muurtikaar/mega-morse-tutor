@@ -30,6 +30,18 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
 OTHER DEALINGS IN THE SOFTWARE.
 
+## Schematics
+
+The schematics show an LM2596 buck converter and a PAM8403 Amplifier module.
+
+## Wiring Diagrams
+
+The wiring diagrams show a simple voltage regulator using a 78L05 IC and a couple of electrolytic capcitors. This is from building Stand-alone Arduinos. The transistor amp was borrowed from the schematic of the K3NG Keyer. These just show that brand new modules do not have to be purchased in order to build this circuit.
+
+## Porting the W8BH Morse Tutor to a Mega2560
+
+The file pin-assignments.txt shows the original Blue Pill pins used, and the corresponding Mega2560 pins that I used to 'port' the W8BH Morse Tutor to the Mega2560. I used a RobotDyn Mega 2560 Pro Mini without a USB port. Your Mega 2560 Pro Mini may have a USB port. Or, you may use a Mega 2560 R3 full size development board. 
+
 ## RESOURCES
 
 Full 8 part Morse Tutor Tutorial (PDF) available at: 
