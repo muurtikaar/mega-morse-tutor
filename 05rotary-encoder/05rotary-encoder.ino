@@ -1,27 +1,27 @@
 /**************************************************************************
       Author:   Bruce E. Hall, w8bh.net
-        Date:   26 Jun 2019
+        Date:   11 Jul 2019
     Hardware:   STM32F103C "Blue Pill", Piezo Buzzer, 2.2" ILI9341 LCD,
                 Adafruit #477 rotary encoder or similar
     Software:   Arduino IDE 1.8.9; stm32duino package @ dan.drown.org
+       Legal:   Copyright (c) 2019  Bruce E. Hall.
+                Open Source under the terms of the MIT License. 
     
- Description:   Morse Code Tutor, Part 5 
-                Builds on Part 4, adding a rotary encoder
-   
+ Description:   Part 5 of the tutorial at w8bh.net
+                Practice sending & receiving morse code
+                Inspired by Jack Purdum's "Morse Code Tutor"
+
+==================================================
+Modified by Ken, KM4NFQ "Not Fully Qualified" 12 August 2019
+Hardware: Mega2560 development board
  **************************************************************************/
-/**************************************************************************
-Modification:   Ken, KM4NFQ "Not Fully Qualified"
-        Date:   8 Jul 2019
-    Hardware:   Mega2560 Pro Mini, TFT display, Rotary Encoder
-    Software:   Arduino IDE 1.8.9
- Description:   'port' from Blue Pill to Mega2560 Pro Mini
-                Adding a Rotary Encoder for item selection.
- **************************************************************************/
+
+//===================================  INCLUDES ========================================= 
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 
-#define CODESPEED          13           // speed in Words per Minute
-#define PITCH       700                 // CHG pitch in Hz of morse audio
+//===================================  Hardware Connections =============================
+
 #define LED         13                  // CHG onboard LED pin
 #define PIEZO       26                  // CHG pin attached to piezo element
 #define DITPERIOD   1200/CODESPEED      // period of dit, in milliseconds
@@ -33,7 +33,13 @@ Modification:   Ken, KM4NFQ "Not Fully Qualified"
 #define ENCODER_BUTTON     18           // CHG Rotary Encoder switch
 #define TFT_DC      48                  // CHG for direct port access
 #define TFT_CS      47                  // CHG for direct port access
-#define TFT_RST     44                  // CHG
+#define TFT_RST     44
+
+//===================================  Morse Code Constants =============================
+#define CODESPEED          13           // speed in Words per Minute
+#define PITCH       700                 // CHG pitch in Hz of morse audio
+#define DITPERIOD   1200/CODESPEED                // period of dit, in milliseconds
+#define WORDSIZE            5                     // number of chars per random word
 #define ELEMENTS(x) (sizeof(x) / sizeof(x[0]))
 
 //===================================  Color Constants ==================================
@@ -67,8 +73,8 @@ volatile long     button_downtime  = 0L;          // ms the button was pushed be
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 int textRow=0, textCol=0;
 
-char *greetings   = "Greetings de KM4NFQ = Name is Ken = +"; // CHG
-char *commonWords = "the of and to a in that is was he for it with as his on be at by I this had not are but from or have an they which one you were all her she there would their we him been has when who will no more if out so up said what its about than into them can only other time new some could these two may first then do any like my now over such our man me even most made after also did many off before must well back through years much where your way"; // CHG
+char *greetings   = "Greetings de W8BH = Name is Bruce = +";
+char *commonWords = "a an the this these that some all any every who which what such other I me my we us our you your he him his she her it its they them their man men people time work well May will can one two great little first at by on upon over before to from with in into out for of about up when then now how so like as well very only no not more there than and or if but be am is are was were been has have had may can could will would shall should must say said like go come do made work";
 char *hamWords[]  = {"DE", "TNX FER", "BT", "WX", "HR", "TEMP", "ES", "RIG", "ANT", "DIPOLE", "VERTICAL", // 0-10
                     "BEAM", "HW", "CPI", "WARM", "SUNNY", "CLOUDY", "COLD", "RAIN", "SNOW", "FOG",       // 11-20
                     "RPT", "NAME", "QTH", "CALL", "UR", "SLD", "FB", "RST"                               // 21-28
@@ -454,14 +460,14 @@ void setup() {
   pinMode(PADDLE_A, INPUT_PULLUP);                // two paddle inputs, both active low
   pinMode(PADDLE_B, INPUT_PULLUP);
   tft.begin();                                    // initialize screen object
-  tft.setRotation(1);                             // landscape mode
+  tft.setRotation(3);                             // landscape mode: use '1' or '3'
   tft.fillScreen(BLACK);                          // start with blank screen
   tft.setTextSize(2);                             // small text but readable
   tft.setTextColor(TEXTCOLOR,BLACK);
 }
 
 void loop() {                              
-  sendLetters();      button_pressed = false; 
+  sendLetters();      button_pressed = true; 
   sendNumbers();      button_pressed = false;
   sendHamWords();     button_pressed = false;  
   sendMixedChars();   button_pressed = false; 
