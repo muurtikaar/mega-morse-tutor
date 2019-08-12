@@ -5,14 +5,14 @@
     Software:   Arduino IDE 1.8.9; stm32duino package @ dan.drown.org
     
  Description:   Practice sending & receiving morse code
-                Derived from Jack Purdum's "Morse Code Tutor"
+                Inspired by Jack Purdum's "Morse Code Tutor"
    
  **************************************************************************/
 /**************************************************************************
 Modification:   Ken, KM4NFQ "Not Fully Qualified"
         Date:   9 Jul 2019
     Hardware:   RobotDyn Mega2560 Pro Mini (non-USB version)
-	        programmed with a USBtoSerial Adapter
+	            programmed with a USBtoSerial Adapter
                 ILI9341 2.2" TFT SPI 320x240 display
                 RobotDyn Rotary Encoder module, small speaker
     Software:   Arduino IDE 1.8.9
