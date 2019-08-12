@@ -45,7 +45,7 @@ Display Pin    Label    Connects To:        Function
 6              MOSI     Mega2560, pin 51    SPI Data
 7              SCK      Mega2560, pin 52    SPI Clock
 8              LED      Vcc bus             (3.3V) LED Backlight Power
-9              MISO     Mega2560, pin 49    SPI Data
+9              MISO     Mega2560, pin 50    SPI Data
  **************************************************************************/
 
 
