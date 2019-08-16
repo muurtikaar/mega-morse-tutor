@@ -40,6 +40,7 @@ Modification: Ken, KM4NFQ "Not Fully Qualified"
 #define PADDLE_A           33    // CHG Morse Paddle "dit"
 #define PADDLE_B           35    // CHG Morse Paddle "dah"
 #define PIEZO              26    // CHG pin attached to piezo element
+#define SCREEN_ROTATION     3    // landscape mode: use '1' or '3'
 //===================================  Morse Code Constants =============================
 #define MYCALL          "KM4NFQ"                    // your callsign for splash scrn & QSO
 #define DEFAULTSPEED       18                     // character speed in Words per Minute
@@ -1189,7 +1190,7 @@ void initMorse()
 void initScreen()
 {
   tft.begin();                                    // initialize screen object
-  tft.setRotation(3);                             // landscape mode: use '1' or '3'
+  tft.setRotation(SCREEN_ROTATION);               // landscape mode: use '1' or '3'
   tft.fillScreen(BLACK);                          // start with blank screen
 }
 
