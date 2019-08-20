@@ -34,19 +34,19 @@ void ditSpaces(int spaces=1) {               // user specifies #dits to wait
 }
 
 void dit() {
-  digitalWrite(LED,0);                       // turn on LED
+  digitalWrite(LED,1);                       // turn on LED
   tone(PIEZO,PITCH);                         // and turn on sound
   ditSpaces();                               // wait for period of 1 dit
-  digitalWrite(LED,1);                       // turn off LED
+  digitalWrite(LED,0);                       // turn off LED
   noTone(PIEZO);                             // and turn off sound
   ditSpaces();                               // space between code elements
 }
 
 void dah() {
-  digitalWrite(LED,0);                       // turn on LED
+  digitalWrite(LED,1);                       // turn on LED
   tone(PIEZO,PITCH);                         // and turn on sound
   ditSpaces(3);                              // length of dah = 3 dits
-  digitalWrite(LED,1);                       // turn off LED
+  digitalWrite(LED,0);                       // turn off LED
   noTone(PIEZO);                             // and turn off sound
   ditSpaces();                               // space between code elements
 }
