@@ -1,7 +1,14 @@
 # W8BH Morse Tutor for the  Mega2560 Pro Mini
 
-Source code for the Bruce Hall W8BH Morse Tutor, 
-ported to the Mega 2560 Pro Mini.
+Source code for the Bruce Hall W8BH Morse Tutor, ported to the 
+Mega 2560 Pro Mini. This 'port' is mainly a pin re-assignment
+from the STM32F104C8T6 'Blue Pill' to the Mega 2560 Pro Mini.
+
+This version of the source code is based on an early release.
+For the latest source code release please see http://w8bh.net/
+
+To 'port' the latest source code to a Mega2560, just edit it
+with the Mega2560 pin assignments.
 
 ## LICENSE
 
