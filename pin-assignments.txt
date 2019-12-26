@@ -25,7 +25,7 @@ Rotary Encoder
 
 SD Card
   pin 1 "SD_CS"     PA4                 53
-  pin 2 "SD_SCK"    PA5                 51
+  pin 2 "SD_SCK"    PA5                 52
   pin 3 "SD_MISO"   PA6                 50
-  pin 4 "SD_MOSI"   PA7                 52
+  pin 4 "SD_MOSI"   PA7                 51
 
